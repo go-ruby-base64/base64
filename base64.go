@@ -90,57 +90,49 @@ var decStdLUT = func() [256]byte {
 // discarded.
 //
 // Rather than fold sextets one byte at a time (the shape of MRI's C loop, but slow
-// in Go), it first compacts each maximal run of alphabet bytes — bulk-copying whole
-// runs and dropping the stray bytes between them — into a scratch buffer, then hands
-// the clean bytes to github.com/go-simd/base64's batched SIMD decoder in a single
-// pass; only the 2/3-char tail is finished by hand. The result is byte-identical to
-// the previous per-byte decoder, but ~5x faster on the common newline-wrapped input
-// (encode64 output), taking the lenient path from far behind MRI to parity with it.
+// in Go), it de-spaces the input with github.com/go-simd/base64's vectorised
+// Compact kernel — a branch-free SWAR pass that copies the alphabet bytes, drops
+// whitespace/newlines/stray bytes, and applies the very same '='-on-a-partial-quad
+// stop rule MRI's C loop uses — then hands the packed alphabet run to that package's
+// batched SIMD decoder. Both passes run over a single mutable copy of the input:
+// Compact de-spaces in place and Decode decodes in place (its documented in-place
+// contract — the write cursor always trails the read cursor), so the whole decode
+// costs one buffer for the working copy plus the result string, matching the
+// allocation profile of MRI's C unpack("m") instead of the extra scratch+output
+// buffers a naive Go port needs. Only the 2/3-char tail is finished by hand. The
+// result is byte-identical to the previous decoder, taking the lenient path from
+// behind MRI to ahead of it (including YJIT).
 func Decode64(s string) string {
 	if len(s) == 0 {
 		return ""
 	}
-	// Pass 1: compact the alphabet bytes, honoring the '=' partial-quad stop. Runs
-	// are copied in bulk (copy over a string is a memmove, no allocation), so the
-	// only per-byte work is finding each run's boundaries.
-	clean := make([]byte, len(s))
-	m := 0
-	for i := 0; i < len(s); {
-		c := s[i]
-		if decStdLUT[c] != 0xFF {
-			j := i + 1
-			for j < len(s) && decStdLUT[s[j]] != 0xFF {
-				j++
-			}
-			m += copy(clean[m:], s[i:j])
-			i = j
-			continue
-		}
-		// A '=' on a 2- or 3-char partial quad finalises it and stops; every other
-		// stray byte (and '=' on a quad boundary) is dropped.
-		if c == '=' && m%4 >= 2 {
-			break
-		}
-		i++
-	}
-	// Pass 2: batch-decode the clean bytes. The whole quads go through the SIMD
-	// kernel; a 2- or 3-char remainder yields whole bytes by hand (a lone orphaned
-	// sextet cannot form a byte and is discarded).
+	// One mutable working buffer holds the input, the compacted alphabet run, and
+	// the decoded bytes in turn — no scratch, no separate output allocation.
+	buf := []byte(s)
+	// Pass 1: SIMD de-space in place. Compact drops every non-alphabet byte and
+	// honours the '='-partial-quad stop, returning the kept count. dst==src is safe:
+	// its write cursor never runs ahead of its read cursor, so a byte is read before
+	// it is overwritten (whole-window moves load all 8 bytes before storing).
+	m := simd.Compact(buf, buf)
+	// Pass 2: batch-decode the clean bytes in place (buf is a prefix of buf — the
+	// documented in-place Decode contract). Whole quads go through the SIMD kernel;
+	// a 2- or 3-char remainder yields whole bytes by hand (a lone orphaned sextet
+	// cannot form a byte and is discarded). The 3*full/4 decoded bytes never reach
+	// buf[full], so the tail sextets stay intact until read below.
 	full := m - m%4
-	dst := make([]byte, len(s)*3/4+3)
 	di := 0
 	if full > 0 {
-		n, _ := simd.Decode(dst, clean[:full])
+		n, _ := simd.Decode(buf, buf[:full])
 		di = n
 	}
 	if rem := m - full; rem >= 2 {
 		var acc uint32
 		for k := full; k < m; k++ {
-			acc = acc<<6 | uint32(decStdLUT[clean[k]])
+			acc = acc<<6 | uint32(decStdLUT[buf[k]])
 		}
-		di += flushPartial(dst[di:], acc, rem)
+		di += flushPartial(buf[di:], acc, rem)
 	}
-	return string(dst[:di])
+	return string(buf[:di])
 }
 
 // flushPartial writes the whole bytes carried by a 2- or 3-sextet partial quad

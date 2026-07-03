@@ -90,6 +90,15 @@ func TestOracleDecode(t *testing.T) {
 	inputs := []string{
 		"aGVsbG8=", "aGVsbG8gd29ybGQ=\n", "YWJj", "YWJjZA", "YQ==",
 		"aGVs bG8=\n junk", "YWJj=ZZZZ", "YW=JjZ", "Q", "====", "",
+		// The lenient hot path: a long newline-wrapped encode64 (the decode-3KiB
+		// campaign input) drives the SIMD Compact de-space + in-place SIMD decode
+		// over many 60-column lines, so the whole-window SWAR move and the in-place
+		// Decode contract are proved byte-for-byte against MRI, not just round-trip.
+		Encode64(strings.Repeat("The quick brown fox. ", 200)),
+		// A long run peppered with stray bytes on every SWAR window boundary forces
+		// the straddle fallback and a compacted length whose tail exercises each
+		// partial-quantum remainder against MRI's C loop.
+		strings.Repeat("YWJjZA==\n\t !", 64) + "aGVsbG8",
 	}
 	for _, in := range inputs {
 		in := in
