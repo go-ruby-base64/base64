@@ -12,6 +12,8 @@ github.com/go-simd/base64 v0.0.0-20260830212547-2fee128e345a h1:wMhy2Tf8691MgS4t
 github.com/go-simd/base64 v0.0.0-20260830212547-2fee128e345a/go.mod h1:P2YPxBiS0h0R01P7Cqrhj4cZHKiacpO3Z2qLE3RflOQ=
 github.com/go-simd/base64 v0.0.0-20260901145456-eb8404bccc8f h1:sfv1tO3vPwaD0uTTJcGWgwDYLKmcILOyL8fziNUKHY4=
 github.com/go-simd/base64 v0.0.0-20260901145456-eb8404bccc8f/go.mod h1:P2YPxBiS0h0R01P7Cqrhj4cZHKiacpO3Z2qLE3RflOQ=
+github.com/go-simd/base64 v0.0.0-20260903220000-c04f5883bb18 h1:qRxVDQapJmkrxakah1XqYxnYc8nhbTUhb0R7ZF+ZkiU=
+github.com/go-simd/base64 v0.0.0-20260903220000-c04f5883bb18/go.mod h1:P2YPxBiS0h0R01P7Cqrhj4cZHKiacpO3Z2qLE3RflOQ=
 golang.org/x/sys v0.28.0 h1:Fksou7UEQUWlKvIdsqzJmUmCX3cZuD2+P3XyyzwMhlA=
 golang.org/x/sys v0.28.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
