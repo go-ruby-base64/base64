@@ -1,6 +1,6 @@
 module github.com/go-ruby-base64/base64
 
-go 1.26.4
+go 1.27.1
 
 require github.com/go-simd/base64 v0.0.0-20260903220000-c04f5883bb18
 
